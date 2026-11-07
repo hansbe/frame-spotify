@@ -37,9 +37,9 @@
   var DEFAULTS = {
     mat: 'warm',
     label: 'signature',
-    size: 'medium',
+    size: 'large',
     idle: 3,
-    artMin: 10,
+    artMin: 30,
     dim: 0,
     awake: true
   };
@@ -521,13 +521,13 @@
   function buildPiece(data, img, instant) {
     var vw = window.innerWidth, vh = window.innerHeight;
     var aspect = img ? (img.naturalWidth / img.naturalHeight) : 1;
-    var maxH = vh * (SIZE[settings.size] || SIZE.medium);
+    var maxH = vh * (SIZE[settings.size] || SIZE.large);
     var maxW = vw * 0.80;
     var h = maxH, w = h * aspect;
     if (w > maxW) { w = maxW; h = w / aspect; }
     w = Math.round(w); h = Math.round(h);
 
-    var bevel = Math.max(3, Math.round(vh * 0.0042));
+    var bevel = Math.max(4, Math.round(vh * 0.0062));
     var labelRoom = settings.label === 'signature' ? vh * 0.07 : 0;
     // Litt over midten, slik verk henges, og med plass til påskriften under
     var top = Math.round((vh - h - labelRoom) / 2 - vh * 0.012);
@@ -591,7 +591,7 @@
   // ---------------------------------------------------------------- passepartout
 
   var MAT_CLASSES = ['warm', 'paper', 'stone', 'tinted', 'charcoal', 'black'];
-  var TINT_VARS = ['--mat', '--ink', '--ink-soft', '--bevel-top', '--bevel-side', '--bevel-bottom', '--card', '--card-ink', '--accent'];
+  var TINT_VARS = ['--mat', '--ink', '--ink-soft', '--bevel-top', '--bevel-right', '--bevel-left', '--bevel-bottom', '--card', '--card-ink', '--accent'];
 
   function applyMat() {
     var body = document.body;
@@ -617,9 +617,10 @@
     root.setProperty('--mat', c(s, 86));
     root.setProperty('--ink', c(Math.min(0.2, s), 36));
     root.setProperty('--ink-soft', c(Math.min(0.16, s), 52));
-    root.setProperty('--bevel-top', c(s * 0.8, 84));
-    root.setProperty('--bevel-side', c(s * 0.6, 92));
-    root.setProperty('--bevel-bottom', c(s * 0.4, 97));
+    root.setProperty('--bevel-top', c(s * 0.8, 78));
+    root.setProperty('--bevel-right', c(s * 0.7, 84));
+    root.setProperty('--bevel-left', c(s * 0.6, 89));
+    root.setProperty('--bevel-bottom', c(s * 0.4, 94));
     root.setProperty('--card', c(s * 0.6, 93));
     root.setProperty('--card-ink', c(Math.min(0.2, s), 22));
     root.setProperty('--accent', c(Math.min(0.2, s), 22));

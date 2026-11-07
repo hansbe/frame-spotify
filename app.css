@@ -5,19 +5,20 @@
   --mat: #ece7de;
   --ink: #6c655a;
   --ink-soft: #978f83;
-  --bevel-top: #d9d3c8;
-  --bevel-side: #eeebe4;
-  --bevel-bottom: #fbfaf7;
+  --bevel-top: #d3cdc2;
+  --bevel-right: #e2ddd3;
+  --bevel-left: #eeeae3;
+  --bevel-bottom: #f7f5f0;
   --grain: 0.13;
   --card: #f6f3ed;
   --card-ink: #3d3933;
   --accent: #3d3933;
 }
 
-body.mat-paper    { --mat: #f4f2ee; --ink: #6a655e; --ink-soft: #9a958d; --bevel-top: #dedbd5; --bevel-side: #f1efeb; --bevel-bottom: #fdfdfb; --card: #fbfaf8; }
-body.mat-stone    { --mat: #c9c5be; --ink: #55504a; --ink-soft: #77726a; --bevel-top: #d9d5cd; --bevel-side: #ebe8e2; --bevel-bottom: #f7f5f1; --card: #dedad3; }
-body.mat-charcoal { --mat: #2d2c2a; --ink: #aca69b; --ink-soft: #858077; --bevel-top: #8d877d; --bevel-side: #bab4a9; --bevel-bottom: #ddd8ce; --grain: 0.09; --card: #3a3936; --card-ink: #d9d4ca; --accent: #d9d4ca; }
-body.mat-black    { --mat: #131312; --ink: #a29c91; --ink-soft: #77726a; --bevel-top: #777168; --bevel-side: #aaa499; --bevel-bottom: #d4cfc5; --grain: 0.07; --card: #1f1e1c; --card-ink: #d6d1c7; --accent: #d6d1c7; }
+body.mat-paper    { --mat: #f4f2ee; --ink: #6a655e; --ink-soft: #9a958d; --bevel-top: #dad7d1; --bevel-right: #e7e5e0; --bevel-left: #f1efeb; --bevel-bottom: #faf9f7; --card: #fbfaf8; }
+body.mat-stone    { --mat: #c9c5be; --ink: #55504a; --ink-soft: #77726a; --bevel-top: #b5b0a8; --bevel-right: #cdc9c1; --bevel-left: #dbd7d0; --bevel-bottom: #e8e5df; --card: #dedad3; }
+body.mat-charcoal { --mat: #2d2c2a; --ink: #aca69b; --ink-soft: #858077; --bevel-top: #6b665e; --bevel-right: #8a857c; --bevel-left: #a29c91; --bevel-bottom: #bdb7ac; --grain: 0.09; --card: #3a3936; --card-ink: #d9d4ca; --accent: #d9d4ca; }
+body.mat-black    { --mat: #131312; --ink: #a29c91; --ink-soft: #77726a; --bevel-top: #55514b; --bevel-right: #6f6b64; --bevel-left: #87827a; --bevel-bottom: #a19c93; --grain: 0.07; --card: #1f1e1c; --card-ink: #d6d1c7; --accent: #d6d1c7; }
 /* mat-tinted får variablene sine fra app.js */
 
 html, body {
@@ -83,8 +84,12 @@ body.pointer-idle * { cursor: none !important; }
   position: absolute;
   box-sizing: content-box;
   border-style: solid;
-  border-color: var(--bevel-top) var(--bevel-side) var(--bevel-bottom) var(--bevel-side);
+  border-color: var(--bevel-top) var(--bevel-right) var(--bevel-bottom) var(--bevel-left);
   background: rgba(0,0,0,0.06);
+  /* Myk overgang der kniven har skåret gjennom papiret, og en svak skygge under kanten */
+  box-shadow:
+    0 0 0.08vh rgba(0,0,0,0.10),
+    0 -0.05vh 0.15vh rgba(0,0,0,0.06);
   transition: border-color 2.4s ease;
 }
 
@@ -95,14 +100,17 @@ body.pointer-idle * { cursor: none !important; }
   object-fit: cover;
 }
 
-/* Skyggen passepartouten kaster inn over bildet */
+/* Bildet ligger lavere enn passepartouten: mørk fuge langs kanten og skygge
+   som faller fra øvre og venstre kant. Kanten løftes også litt med lys nederst. */
 .cut .shade {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
   box-shadow:
-    inset 0 0.55vh 0.9vh -0.25vh rgba(0,0,0,0.38),
-    inset 0.35vh 0 0.7vh -0.3vh rgba(0,0,0,0.16),
-    inset -0.2vh 0 0.5vh -0.3vh rgba(0,0,0,0.08);
+    inset 0 0 0 0.06vh rgba(0,0,0,0.28),
+    inset 0 1.1vh 1.3vh -0.7vh rgba(0,0,0,0.42),
+    inset 0.8vh 0 1.1vh -0.7vh rgba(0,0,0,0.22),
+    inset -0.5vh 0 0.8vh -0.5vh rgba(0,0,0,0.08),
+    inset 0 -0.4vh 0.6vh -0.4vh rgba(255,255,255,0.10);
   pointer-events: none;
 }
 
