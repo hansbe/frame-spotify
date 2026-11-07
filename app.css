@@ -1,0 +1,350 @@
+/* Frame Spotify — passepartout-visning for Samsung The Frame.
+   Skrevet for eldre TV-nettlesere (Chromium 69+): ingen inset, gap eller aspect-ratio. */
+
+:root {
+  --mat: #ece7de;
+  --ink: #6c655a;
+  --ink-soft: #978f83;
+  --bevel-top: #d9d3c8;
+  --bevel-side: #eeebe4;
+  --bevel-bottom: #fbfaf7;
+  --grain: 0.13;
+  --card: #f6f3ed;
+  --card-ink: #3d3933;
+  --accent: #3d3933;
+}
+
+body.mat-paper    { --mat: #f4f2ee; --ink: #6a655e; --ink-soft: #9a958d; --bevel-top: #dedbd5; --bevel-side: #f1efeb; --bevel-bottom: #fdfdfb; --card: #fbfaf8; }
+body.mat-stone    { --mat: #c9c5be; --ink: #55504a; --ink-soft: #77726a; --bevel-top: #d9d5cd; --bevel-side: #ebe8e2; --bevel-bottom: #f7f5f1; --card: #dedad3; }
+body.mat-charcoal { --mat: #2d2c2a; --ink: #aca69b; --ink-soft: #858077; --bevel-top: #8d877d; --bevel-side: #bab4a9; --bevel-bottom: #ddd8ce; --grain: 0.09; --card: #3a3936; --card-ink: #d9d4ca; --accent: #d9d4ca; }
+body.mat-black    { --mat: #131312; --ink: #a29c91; --ink-soft: #77726a; --bevel-top: #777168; --bevel-side: #aaa499; --bevel-bottom: #d4cfc5; --grain: 0.07; --card: #1f1e1c; --card-ink: #d6d1c7; --accent: #d6d1c7; }
+/* mat-tinted får variablene sine fra app.js */
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--mat);
+  color: var(--ink);
+  font-family: "Jost", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 2.4s ease;
+  cursor: default;
+}
+
+body.pointer-idle,
+body.pointer-idle * { cursor: none !important; }
+
+#wall, #paper, #light, #stage, #dim {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+}
+
+/* Papirstruktur og romlys gjør flaten til en passepartout i stedet for en skjermfarge */
+#paper {
+  background: url("assets/paper.png") repeat;
+  background-size: 256px 256px;
+  mix-blend-mode: overlay;
+  opacity: var(--grain);
+  pointer-events: none;
+}
+
+#light {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,255,255,0.10), rgba(255,255,255,0) 70%),
+    linear-gradient(to bottom, rgba(0,0,0,0) 55%, rgba(0,0,0,0.045) 100%);
+  pointer-events: none;
+}
+
+#dim {
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.2s ease;
+}
+
+/* ---------- Verket ---------- */
+
+.piece {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  opacity: 0;
+  transition: opacity 1.6s ease;
+}
+.piece.in { opacity: 1; }
+.piece.instant { transition: none; }
+
+/* Skjærekanten: border med ulike farger gir en 45°-fas med lys ovenfra */
+.cut {
+  position: absolute;
+  box-sizing: content-box;
+  border-style: solid;
+  border-color: var(--bevel-top) var(--bevel-side) var(--bevel-bottom) var(--bevel-side);
+  background: rgba(0,0,0,0.06);
+  transition: border-color 2.4s ease;
+}
+
+.cut img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Skyggen passepartouten kaster inn over bildet */
+.cut .shade {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  box-shadow:
+    inset 0 0.55vh 0.9vh -0.25vh rgba(0,0,0,0.38),
+    inset 0.35vh 0 0.7vh -0.3vh rgba(0,0,0,0.16),
+    inset -0.2vh 0 0.5vh -0.3vh rgba(0,0,0,0.08);
+  pointer-events: none;
+}
+
+.cut.empty {
+  background: rgba(0,0,0,0.035);
+}
+
+/* ---------- Signatur: som blyantpåskrift under et trykk ---------- */
+
+.inscription {
+  position: absolute;
+  display: none;
+  white-space: nowrap;
+  color: var(--ink);
+  transition: color 2.4s ease;
+}
+body.label-signature .inscription { display: block; }
+
+.inscription .i-row {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-justify-content: space-between; justify-content: space-between;
+  -webkit-align-items: flex-start; align-items: flex-start;
+}
+.inscription .i-left {
+  -webkit-flex: 0 1 auto; flex: 0 1 auto;
+  min-width: 0;
+  max-width: 64%;
+  text-align: left;
+}
+.inscription .i-right {
+  -webkit-flex: 0 1 auto; flex: 0 1 auto;
+  min-width: 0;
+  max-width: 44%;
+  margin-left: 2.5vw;
+  text-align: right;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 2.2vh;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inscription .i-title {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-style: italic;
+  font-size: 2.35vh;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inscription .i-sub {
+  margin-top: 0.55vh;
+  font-size: 1.1vh;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inscription .i-sub:empty { display: none; }
+
+/* ---------- Museumsetikett: et lite kort ved siden av verket ---------- */
+
+.label-card {
+  position: absolute;
+  display: none;
+  width: 14.5vw;
+  box-sizing: border-box;
+  padding: 1.6vh 1.2vw 1.7vh;
+  background: var(--card);
+  color: var(--card-ink);
+  box-shadow: 0 0.15vh 0.35vh rgba(0,0,0,0.10), 0 0.6vh 1.6vh rgba(0,0,0,0.06);
+  transition: background-color 2.4s ease, color 2.4s ease;
+}
+body.label-museum .label-card { display: block; }
+
+.label-card .l-artist {
+  font-size: 1.45vh;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+}
+.label-card .l-title {
+  margin-top: 0.7vh;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-style: italic;
+  font-size: 2.15vh;
+  line-height: 1.15;
+}
+.label-card .l-meta {
+  margin-top: 0.9vh;
+  font-size: 1.2vh;
+  font-weight: 300;
+  letter-spacing: 0.03em;
+  line-height: 1.35;
+  opacity: 0.75;
+}
+.label-card .l-artist:empty,
+.label-card .l-meta:empty { display: none; }
+.label-card .l-artist:empty + .l-title { margin-top: 0; }
+
+/* ---------- Overlegg: innlogging og meny ---------- */
+
+.overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-align-items: center; align-items: center;
+  -webkit-justify-content: center; justify-content: center;
+  background: rgba(0,0,0,0.18);
+  z-index: 10;
+}
+.overlay[hidden] { display: none; }
+
+.card {
+  width: 34vw;
+  min-width: 420px;
+  box-sizing: border-box;
+  padding: 4.4vh 2.6vw 4vh;
+  background: var(--card);
+  color: var(--card-ink);
+  box-shadow: 0 0.4vh 1vh rgba(0,0,0,0.12), 0 2.5vh 6vh rgba(0,0,0,0.18);
+}
+
+.card-kicker {
+  font-size: 1.25vh;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.card-title {
+  margin: 1.6vh 0 1.4vh;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-weight: 500;
+  font-size: 4vh;
+  line-height: 1.1;
+}
+.card-text {
+  margin: 0 0 3.2vh;
+  font-size: 1.75vh;
+  font-weight: 300;
+  line-height: 1.5;
+}
+.card-text code {
+  font-size: 0.95em;
+  background: rgba(0,0,0,0.06);
+  padding: 0 0.3em;
+}
+
+.btn {
+  display: block;
+  width: 100%;
+  margin: 0 0 1.2vh;
+  padding: 1.5vh 1vw;
+  font: inherit;
+  font-size: 1.8vh;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: var(--card);
+  background: var(--accent);
+  border: 0.25vh solid var(--accent);
+  border-radius: 0;
+  cursor: pointer;
+  outline: none;
+}
+.btn-quiet {
+  color: var(--card-ink);
+  background: transparent;
+  border-color: rgba(128,128,128,0.35);
+  font-weight: 400;
+}
+.btn:focus, .btn.focus {
+  box-shadow: 0 0 0 0.35vh var(--card), 0 0 0 0.7vh var(--accent);
+}
+
+.card-menu { width: 38vw; }
+
+#menu-list {
+  list-style: none;
+  margin: 2vh 0 0;
+  padding: 0;
+}
+#menu-list li {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-justify-content: space-between; justify-content: space-between;
+  -webkit-align-items: baseline; align-items: baseline;
+  padding: 1.15vh 1vw;
+  margin: 0 -1vw;
+  font-size: 1.85vh;
+  cursor: pointer;
+  border-left: 0.35vh solid transparent;
+}
+#menu-list li.focus {
+  background: rgba(128,128,128,0.13);
+  border-left-color: var(--accent);
+}
+#menu-list li.sep { margin-top: 1.2vh; }
+#menu-list .m-label { font-weight: 400; }
+#menu-list .m-value {
+  font-weight: 300;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+#menu-list li.focus .m-value:before { content: "\2039\00a0\00a0"; opacity: 0.5; }
+#menu-list li.focus .m-value:after  { content: "\00a0\00a0\203a"; opacity: 0.5; }
+#menu-list li.action .m-value:before,
+#menu-list li.action .m-value:after { content: ""; }
+
+.menu-hint {
+  margin: 2.4vh 0 0;
+  font-size: 1.25vh;
+  font-weight: 300;
+  opacity: 0.55;
+}
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 3vh;
+  -webkit-transform: translateX(-50%); transform: translateX(-50%);
+  padding: 0.9vh 1.4vw;
+  font-size: 1.35vh;
+  font-weight: 300;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  z-index: 20;
+  white-space: nowrap;
+}
+#toast.show { opacity: 0.85; }
+
+#keepawake {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  width: 2px;
+  height: 2px;
+  opacity: 0.01;
+  pointer-events: none;
+}

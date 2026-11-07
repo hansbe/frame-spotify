@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ece7de">
+<title>Frame Spotify</title>
+<link rel="icon" href="tizen/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="mat-warm label-signature">
+
+<div id="wall">
+  <div id="paper"></div>
+  <div id="light"></div>
+  <div id="stage"></div>
+</div>
+<div id="dim"></div>
+
+<div id="login" class="overlay" hidden>
+  <div class="card">
+    <div class="card-kicker">Frame · Spotify</div>
+    <h1 class="card-title">Det som spilles, innrammet</h1>
+    <p class="card-text" id="login-text">Koble til Spotify-kontoen din. Når ingenting spilles, vises dine egne bilder.</p>
+    <button type="button" class="btn" id="login-btn">Koble til Spotify</button>
+    <button type="button" class="btn btn-quiet" id="login-skip">Bare vis egne bilder</button>
+  </div>
+</div>
+
+<div id="menu" class="overlay" hidden>
+  <div class="card card-menu">
+    <div class="card-kicker">Innstillinger</div>
+    <ul id="menu-list" role="menu"></ul>
+    <p class="menu-hint">Opp/ned for å velge · venstre/høyre for å endre · Tilbake for å lukke</p>
+  </div>
+</div>
+
+<div id="toast" aria-live="polite"></div>
+<video id="keepawake" src="assets/keepawake.mp4" muted loop playsinline preload="auto"></video>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
