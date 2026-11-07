@@ -61,6 +61,9 @@ body.pointer-idle * { cursor: none !important; }
   pointer-events: none;
 }
 
+body.idle-black #dim { opacity: 1 !important; }
+body.idle-black { cursor: none; }
+
 #dim {
   background: #000;
   opacity: 0;

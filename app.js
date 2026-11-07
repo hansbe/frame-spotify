@@ -11,7 +11,7 @@
   var DEMO = QS.demo === '1';
   var CLIENT_ID = QS.client_id || CFG.spotifyClientId || '';
   var REDIRECT_URI = CFG.redirectUri || (location.origin + location.pathname.replace(/index\.html$/, ''));
-  var SCOPES = 'user-read-currently-playing user-read-playback-state';
+  var SCOPES = 'user-read-currently-playing user-read-playback-state user-top-read';
   var API = 'https://api.spotify.com/v1';
   var ACCOUNTS = 'https://accounts.spotify.com';
 
@@ -39,6 +39,9 @@
     label: 'signature',
     size: 'large',
     idle: 3,
+    idleShow: 'top',
+    topRange: 'short_term',
+    topMin: 2,
     artMin: 30,
     dim: 0,
     awake: true
@@ -52,9 +55,15 @@
       ['signature', 'Signatur under bildet'], ['museum', 'Museumsetikett'], ['none', 'Ingen']] },
     { key: 'size', label: 'Bildestørrelse', values: [
       ['small', 'Liten'], ['medium', 'Middels'], ['large', 'Stor']] },
-    { key: 'idle', label: 'Egne bilder etter pause', values: [
+    { key: 'idleShow', label: 'Når ingenting spilles', values: [
+      ['top', 'Mest spilte album'], ['blank', 'Tom passepartout'], ['black', 'Svart skjerm'], ['art', 'Egne bilder']] },
+    { key: 'idle', label: 'Bytt etter pause på', values: [
       [1, '1 min'], [3, '3 min'], [10, '10 min'], [30, '30 min']] },
-    { key: 'artMin', label: 'Bytt eget bilde hvert', values: [
+    { key: 'topRange', label: 'Mest spilt', when: function () { return settings.idleShow === 'top'; }, values: [
+      ['short_term', 'Siste 4 uker'], ['medium_term', 'Siste 6 måneder'], ['long_term', 'Siste år']] },
+    { key: 'topMin', label: 'Bytt album hvert', when: function () { return settings.idleShow === 'top'; }, values: [
+      [0.5, '30 sek'], [1, '1 min'], [2, '2 min'], [5, '5 min'], [10, '10 min']] },
+    { key: 'artMin', label: 'Bytt eget bilde hvert', when: function () { return settings.idleShow === 'art'; }, values: [
       [1, '1 min'], [5, '5 min'], [10, '10 min'], [30, '30 min'], [60, '1 time'], [240, '4 timer']] },
     { key: 'dim', label: 'Lysstyrke', values: [
       [0, '100 %'], [0.2, '80 %'], [0.4, '60 %'], [0.6, '40 %']] },
@@ -85,6 +94,11 @@
     pollTimer: null,
     artTimer: null,
     art: [],
+    top: [],
+    topIdx: 0,
+    topLoadedAt: 0,
+    topRangeLoaded: null,
+    scopePrompted: false,
     artOrder: [],
     artLoadedAt: 0,
     failures: 0,
@@ -217,6 +231,7 @@
     store.set('fs.token', {
       access: j.access_token,
       refresh: j.refresh_token || old.refresh,   // Spotify roterer refresh-token
+      scope: j.scope || old.scope || '',
       exp: Date.now() + (j.expires_in || 3600) * 1000
     });
   }
@@ -389,6 +404,13 @@
     { item: true, id: 'demo-b', title: 'Kitchen Table Geometry', artist: 'Mareld', album: 'Small Architecture',
       year: '2019', image: 'demo/cover-b.jpg', isPlaying: true, progress: 0, duration: 20000 }
   ];
+  var DEMO_TOP = [
+    { album: { id: 'b', name: 'Small Architecture', release_date: '2019', artists: [{ name: 'Mareld' }],
+      images: [{ url: 'demo/cover-b.jpg', width: 640 }] } },
+    { album: { id: 'a', name: 'Harbour Hours', release_date: '2024', artists: [{ name: 'Ingrid Sol & The Low Tide' }],
+      images: [{ url: 'demo/cover-a.jpg', width: 640 }] } }
+  ];
+
   function fetchDemo() {
     if (QS.demostate === 'art') return Promise.resolve({ none: true });
     if (QS.demostate === 'a') return Promise.resolve(DEMO_TRACKS[0]);
@@ -463,6 +485,7 @@
     if (state.mode === 'music' && state.key === key) return;
     state.mode = 'music';
     stopArtTimer();
+    document.body.classList.remove('idle-black');
     render(key, {
       src: n.image,
       left: n.title,
@@ -479,6 +502,7 @@
     state.piece = data;
     var seq = ++state.renderSeq;
     var load = data.src ? loadImage(data.src) : Promise.resolve(null);
+    if (data.blank && settings.mat === 'tinted') applyTint(null);
     load.then(function (img) {
       if (seq !== state.renderSeq) return;
       if (settings.mat === 'tinted') applyTint(img);
@@ -534,6 +558,7 @@
     var left = Math.round((vw - w) / 2);
 
     var piece = el('div', 'piece' + (instant ? ' instant' : ''));
+    if (data.blank) return piece;
 
     var cut = el('div', 'cut' + (img ? '' : ' empty'));
     cut.style.left = (left - bevel) + 'px';
@@ -746,18 +771,36 @@
     return state.art[state.artOrder.shift()];
   }
 
+  // «Art» er hvilemodus: det som vises når ingenting spilles (se innstillingen idleShow)
   function enterArt() {
     if (state.mode === 'art') return;
     state.mode = 'art';
     showNextArt();
   }
 
+  function restartIdle() {
+    if (state.mode !== 'art') return;
+    state.mode = null;
+    enterArt();
+  }
+
   function showNextArt() {
     stopArtTimer();
+    var show = settings.idleShow;
+    document.body.classList.toggle('idle-black', show === 'black');
+    if (show === 'blank' || show === 'black') {
+      render('idle:blank', { blank: true });
+      return;
+    }
+    if (show === 'top') { showNextTopAlbum(); return; }
+    showNextOwnImage();
+  }
+
+  function showNextOwnImage() {
     var stale = Date.now() - state.artLoadedAt > 600000;
     var ready = (stale || !state.art.length) ? loadArtList() : Promise.resolve(state.art);
     ready.then(function () {
-      if (state.mode !== 'art') return;
+      if (state.mode !== 'art' || settings.idleShow !== 'art') return;
       var a = nextArt();
       if (!a) {
         render('art:empty', {
@@ -771,6 +814,96 @@
         });
       }
       state.artTimer = setTimeout(showNextArt, settings.artMin * 60000);
+    });
+  }
+
+  // ---------------------------------------------------------------- mest spilte album
+
+  function hasTopScope() {
+    if (DEMO) return true;
+    var t = tokens();
+    return !!(t && t.scope && t.scope.indexOf('user-top-read') >= 0);
+  }
+
+  function needTopScope() {
+    render('idle:blank', { blank: true });
+    if (state.loggedIn && !state.scopePrompted) {
+      state.scopePrompted = true;
+      showLogin('For å vise de mest spilte albumene dine trenger appen én ny tillatelse fra Spotify. Koble til på nytt for å gi den.');
+    }
+  }
+
+  function loadTopAlbums() {
+    var fresh = Date.now() - state.topLoadedAt < 6 * 3600000 && state.topRangeLoaded === settings.topRange;
+    if (fresh && state.top.length) return Promise.resolve(state.top);
+    var range = settings.topRange;
+    var req = DEMO ? Promise.resolve({ items: DEMO_TOP }) :
+      accessToken().then(function (tok) {
+        return fetch(API + '/me/top/tracks?limit=50&time_range=' + range, {
+          headers: { Authorization: 'Bearer ' + tok }
+        });
+      }).then(function (r) {
+        if (r.status === 403 || r.status === 401) { var e = new Error('scope'); e.scope = true; throw e; }
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      });
+    return req.then(function (j) {
+      state.top = rankAlbums(j.items || []);
+      state.topLoadedAt = Date.now();
+      state.topRangeLoaded = range;
+      state.topIdx = 0;
+      return state.top;
+    });
+  }
+
+  // Album rangeres etter hvor høyt og hvor mange av sporene deres ligger på topplisten
+  function rankAlbums(tracks) {
+    var byId = {}, list = [];
+    tracks.forEach(function (t, i) {
+      var a = t.album;
+      if (!a || !a.images || !a.images.length) return;
+      var id = a.id || a.uri || a.name;
+      if (!byId[id]) {
+        byId[id] = {
+          score: 0,
+          title: a.name || '',
+          artist: ((a.artists && a.artists.length ? a.artists : t.artists) || []).map(function (x) { return x.name; }).join(', '),
+          year: (a.release_date || '').slice(0, 4),
+          image: largestImage(a.images)
+        };
+        list.push(byId[id]);
+      }
+      byId[id].score += tracks.length - i;
+    });
+    list.sort(function (x, y) { return y.score - x.score; });
+    return list.slice(0, 24);
+  }
+
+  function showNextTopAlbum() {
+    if (!hasTopScope()) { needTopScope(); return; }
+    loadTopAlbums().then(function (albums) {
+      if (state.mode !== 'art' || settings.idleShow !== 'top') return;
+      if (!albums.length) {
+        render('idle:blank', { blank: true });
+      } else {
+        var a = albums[state.topIdx % albums.length];
+        state.topIdx = (state.topIdx + 1) % albums.length;
+        render('top:' + a.image, {
+          src: a.image,
+          left: a.title,
+          mid: a.year,
+          right: a.artist,
+          cardArtist: a.artist,
+          cardTitle: a.title,
+          cardMeta: a.year
+        });
+      }
+      state.artTimer = setTimeout(showNextArt, settings.topMin * 60000);
+    }).catch(function (err) {
+      if (err && (err.scope || err.auth)) { needTopScope(); return; }
+      // Nettverksfeil: vis tom passepartout og prøv igjen om litt
+      if (!state.top.length) render('idle:blank', { blank: true });
+      state.artTimer = setTimeout(showNextArt, 60000);
     });
   }
 
@@ -818,8 +951,8 @@
     if (!CLIENT_ID) {
       text.innerHTML = 'Mangler Spotify Client ID. Legg den inn i <code>config.js</code>, eller åpne siden med <code>?client_id=…</code>.';
       btn.style.display = 'none';
-    } else if (msg) {
-      text.textContent = msg;
+    } else {
+      text.textContent = msg || 'Koble til Spotify-kontoen din for å vise det som spilles.';
     }
     $login.hidden = false;
     loginFocus = CLIENT_ID ? 0 : 1;
@@ -848,14 +981,23 @@
   var menuItems = [];
 
   function buildMenu() {
-    menuItems = OPTIONS.map(function (o) { return { type: 'option', opt: o }; });
-    menuItems.push({ type: 'action', label: 'Vis neste eget bilde', run: function () {
-      closeMenu(); state.mode = 'art'; stopArtTimer(); showNextArt();
-    }, sep: true });
+    menuItems = OPTIONS.filter(function (o) { return !o.when || o.when(); })
+      .map(function (o) { return { type: 'option', opt: o }; });
+    var nextLabel = settings.idleShow === 'top' ? 'Vis neste album' : (settings.idleShow === 'art' ? 'Vis neste eget bilde' : null);
+    if (nextLabel) {
+      menuItems.push({ type: 'action', label: nextLabel, run: function () {
+        closeMenu(); state.mode = 'art'; stopArtTimer(); showNextArt();
+      }, sep: true });
+    }
     if (!DEMO) {
-      menuItems.push(state.loggedIn
-        ? { type: 'action', label: 'Logg ut av Spotify', run: function () { closeMenu(); logout(); } }
-        : { type: 'action', label: 'Koble til Spotify', run: function () { closeMenu(); showLogin(); } });
+      if (state.loggedIn) {
+        menuItems.push({ type: 'action', label: 'Koble til Spotify på nytt', sep: !nextLabel,
+          run: function () { closeMenu(); startLogin(); } });
+        menuItems.push({ type: 'action', label: 'Logg ut av Spotify', run: function () { closeMenu(); logout(); } });
+      } else {
+        menuItems.push({ type: 'action', label: 'Koble til Spotify', sep: !nextLabel,
+          run: function () { closeMenu(); showLogin(); } });
+      }
     }
     menuItems.push({ type: 'action', label: 'Lukk', run: closeMenu });
 
@@ -904,9 +1046,19 @@
     if (key === 'label' || key === 'size') { applyLabel(); relayout(); }
     if (key === 'dim') applyDim();
     if (key === 'awake') keepAwake();
-    if (key === 'artMin' && state.mode === 'art') {
+    if ((key === 'artMin' || key === 'topMin') && state.mode === 'art') {
       stopArtTimer();
-      state.artTimer = setTimeout(showNextArt, settings.artMin * 60000);
+      state.artTimer = setTimeout(showNextArt, settings[key] * 60000);
+    }
+    if (key === 'topRange') { state.topLoadedAt = 0; restartIdle(); }
+    if (key === 'idleShow') {
+      state.scopePrompted = false;
+      restartIdle();
+      // Menyen viser bare valgene som hører til det som er valgt
+      var focusKey = menuItems[menuFocus] && menuItems[menuFocus].opt && menuItems[menuFocus].opt.key;
+      buildMenu();
+      menuItems.forEach(function (it, i) { if (it.opt && it.opt.key === focusKey) menuFocus = i; });
+      updateMenuFocus();
     }
   }
 

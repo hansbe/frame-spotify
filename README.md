@@ -1,6 +1,6 @@
 # Frame Spotify
 
-Viser det som spilles på Spotify som et innrammet kunstverk på Samsung The Frame: albumcoveret i et passepartout med fasekant, og en diskret tekst med sang, artist, album og år. Når ingenting har spilt på en stund, går visningen over til dine egne bilder.
+Viser det som spilles på Spotify som et innrammet kunstverk på Samsung The Frame: albumcoveret i et passepartout med fasekant, og en diskret tekst med sang, artist, album og år. Når ingenting har spilt på en stund, viser den en karusell med albumene du har spilt mest. Du kan også velge tom passepartout, svart skjerm eller egne bilder.
 
 Appen er en ren nettside, publisert på Vercel (GitHub Pages fungerer også). Den logger inn direkte mot Spotify fra nettleseren (Authorization Code med PKCE), så det trengs ingen server, ingen client secret og ingen maskin som står på hjemme.
 
@@ -42,17 +42,28 @@ Hvis TV-en går over til skjermsparer etter en stund, slå av **Tid for automati
 | Opp/ned i menyen | Velger linje |
 | Venstre/høyre eller OK | Endrer verdi |
 | Tilbake | Lukker menyen |
-| Høyre (når egne bilder vises) | Neste bilde |
+| Høyre (når ingenting spilles) | Neste album eller bilde |
 
 Bruker nettleseren en peker i stedet for piltaster, åpner et klikk hvor som helst menyen.
 
-**Innstillinger:** passepartout (varm hvit, papirhvit, steingrå, tonet etter bildet, antrasitt, sort), tekst (signatur under bildet, museumsetikett eller ingen), bildestørrelse, hvor lenge etter pause egne bilder tar over, hvor ofte egne bilder byttes, lysstyrke og om skjermen skal holdes våken. Valgene lagres på TV-en.
+**Innstillinger:** passepartout (varm hvit, papirhvit, steingrå, tonet etter bildet, antrasitt, sort), tekst (signatur under bildet, museumsetikett eller ingen), bildestørrelse, hva som vises når ingenting spilles, hvor lenge etter pause det byttes, lysstyrke og om skjermen skal holdes våken. Valgene lagres på enheten.
+
+**Når ingenting spilles:**
+
+| Valg | Viser |
+|---|---|
+| Mest spilte album (standard) | Albumene fra din Spotify-toppliste, ett om gangen. Velg periode (4 uker, 6 måneder, 1 år) og hvor ofte de byttes |
+| Tom passepartout | Bare passepartouten |
+| Svart skjerm | Ingenting |
+| Egne bilder | Bildene i `art/`-mappen |
+
+Topplisten krever tillatelsen `user-top-read`. Har du logget inn før denne kom med, ber appen deg koble til Spotify på nytt én gang.
 
 Valgene kan også settes i adressen, f.eks. `?mat=black&label=museum&size=large`.
 
 ## Egne bilder
 
-Legg bilder i mappen `art/` i repoet. På mobilen: åpne repoet i GitHub-appen eller på github.com, gå til `art/` og velg **Add file → Upload files**. Bildene publiseres automatisk og dukker opp på TV-en innen ti minutter. På Vercel henter appen bildelisten fra GitHub-repoet (`githubRepo` i `config.js`); på GitHub Pages lages lista ved publisering.
+Velg *Egne bilder* under «Når ingenting spilles». Legg bilder i mappen `art/` i repoet. På mobilen: åpne repoet i GitHub-appen eller på github.com, gå til `art/` og velg **Add file → Upload files**. Bildene publiseres automatisk og dukker opp på TV-en innen ti minutter. På Vercel henter appen bildelisten fra GitHub-repoet (`githubRepo` i `config.js`); på GitHub Pages lages lista ved publisering.
 
 Filnavnet blir teksten under bildet:
 
