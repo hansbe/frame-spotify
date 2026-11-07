@@ -668,23 +668,55 @@
 
   // ---------------------------------------------------------------- egne bilder
 
+  // Lista over egne bilder: art/art.json når den finnes (GitHub Pages lager den),
+  // ellers mappeinnholdet fra GitHub-repoet (f.eks. ved publisering på Vercel).
+  var IMAGE_RE = /\.(jpe?g|png|webp|gif|avif)$/i;
+
+  function fetchArtJson() {
+    var bucket = Math.floor(Date.now() / 600000);
+    return fetch('art/art.json?v=' + bucket, { cache: 'no-cache' }).then(function (r) {
+      if (!r.ok) throw new Error('no art.json');
+      return r.json();
+    }).then(function (list) {
+      if (list && list.images) list = list.images;
+      if (!Array.isArray(list)) throw new Error('bad art.json');
+      return list;
+    });
+  }
+
+  function fetchArtFromGitHub() {
+    if (!CFG.githubRepo) return Promise.reject(new Error('no repo'));
+    var url = 'https://api.github.com/repos/' + CFG.githubRepo + '/contents/art' +
+      (CFG.githubBranch ? '?ref=' + encodeURIComponent(CFG.githubBranch) : '');
+    return fetch(url, { headers: { Accept: 'application/vnd.github+json' } }).then(function (r) {
+      if (!r.ok) throw new Error('github ' + r.status);
+      return r.json();
+    }).then(function (items) {
+      return items.filter(function (i) { return i.type === 'file' && IMAGE_RE.test(i.name); })
+        .map(function (i) { return i.name; })
+        .sort();
+    });
+  }
+
   function loadArtList() {
-    var bucket = Math.floor(Date.now() / 600000);   // hent lista på nytt hvert 10. minutt
-    return fetch('art/art.json?v=' + bucket, { cache: 'no-cache' })
-      .then(function (r) { return r.ok ? r.json() : []; })
-      .catch(function () { return []; })
-      .then(function (list) {
-        if (list && list.images) list = list.images;
-        state.art = (list || []).map(function (entry) {
-          if (typeof entry === 'string') {
-            var meta = parseArtName(entry);
-            return { src: 'art/' + encodeURIComponent(entry), title: meta.title, byline: meta.byline };
-          }
-          return { src: entry.src, title: entry.title || '', byline: entry.byline || '' };
-        });
-        state.artLoadedAt = Date.now();
-        return state.art;
+    return fetchArtJson().catch(fetchArtFromGitHub).then(function (list) {
+      state.art = list.map(function (entry) {
+        if (typeof entry === 'string') {
+          var meta = parseArtName(entry);
+          return { src: 'art/' + encodeURIComponent(entry), title: meta.title, byline: meta.byline };
+        }
+        return { src: entry.src, title: entry.title || '', byline: entry.byline || '' };
       });
+      // Fjern bilder som ikke lenger finnes fra køen
+      var srcs = state.art.map(function (a) { return a.src; });
+      state.artOrder = state.artOrder.filter(function (i) { return i < srcs.length; });
+      state.artLoadedAt = Date.now();
+      return state.art;
+    }).catch(function () {
+      // Behold forrige liste hvis begge kildene feiler; prøv igjen om et par minutter
+      state.artLoadedAt = Date.now() - 480000;
+      return state.art;
+    });
   }
 
   // «Tittel - Kunstner, år.jpg» blir tittel og byline. Kameranavn som IMG_1234 får ingen tekst.

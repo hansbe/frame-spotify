@@ -4,6 +4,10 @@ window.FRAME_CONFIG = {
   spotifyClientId: "30ce9acecb8c465b8f8072bdce156b16",
 
   // Må være identisk med Redirect URI i Spotify-appen.
-  // null = adressen siden ligger på, f.eks. https://hansbe.github.io/frame-spotify/
-  redirectUri: null
+  // null = adressen siden ligger på, f.eks. https://frame-spotify.vercel.app/
+  redirectUri: null,
+
+  // Brukes til å finne bildene i art/ når siden ikke ligger på GitHub Pages (f.eks. Vercel)
+  githubRepo: "hansbe/frame-spotify",
+  githubBranch: "main"
 };
