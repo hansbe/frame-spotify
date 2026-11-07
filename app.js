@@ -37,7 +37,7 @@
   var DEFAULTS = {
     mat: 'charcoal',
     label: 'signature',
-    size: 'large',
+    size: 'medium',
     idle: 3,
     idleShow: 'top',
     topRange: 'short_term',
@@ -545,7 +545,7 @@
   function buildPiece(data, img, instant) {
     var vw = window.innerWidth, vh = window.innerHeight;
     var aspect = img ? (img.naturalWidth / img.naturalHeight) : 1;
-    var maxH = vh * (SIZE[settings.size] || SIZE.large);
+    var maxH = vh * (SIZE[settings.size] || SIZE.medium);
     var maxW = vw * 0.80;
     var h = maxH, w = h * aspect;
     if (w > maxW) { w = maxW; h = w / aspect; }
