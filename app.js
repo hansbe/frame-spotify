@@ -35,7 +35,7 @@
   // ---------------------------------------------------------------- innstillinger
 
   var DEFAULTS = {
-    mat: 'warm',
+    mat: 'charcoal',
     label: 'signature',
     size: 'large',
     idle: 3,

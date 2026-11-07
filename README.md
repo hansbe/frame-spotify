@@ -46,7 +46,7 @@ Hvis TV-en går over til skjermsparer etter en stund, slå av **Tid for automati
 
 Bruker nettleseren en peker i stedet for piltaster, åpner et klikk hvor som helst menyen.
 
-**Innstillinger:** passepartout (varm hvit, papirhvit, steingrå, tonet etter bildet, antrasitt, sort), tekst (signatur under bildet, museumsetikett eller ingen), bildestørrelse, hva som vises når ingenting spilles, hvor lenge etter pause det byttes, lysstyrke og om skjermen skal holdes våken. Valgene lagres på enheten.
+**Innstillinger:** passepartout (antrasitt som standard, ellers varm hvit, papirhvit, steingrå, tonet etter bildet eller sort), tekst (signatur under bildet, museumsetikett eller ingen), bildestørrelse, hva som vises når ingenting spilles, hvor lenge etter pause det byttes, lysstyrke og om skjermen skal holdes våken. Valgene lagres på enheten.
 
 **Når ingenting spilles:**
 
