@@ -224,19 +224,117 @@
 
   function AuthError(msg) { this.auth = true; this.message = msg; }
 
-  function tokens() { return store.get('fs.token', null); }
+  // Flere Spotify-brukere kan være lagret på samme enhet. Én er aktiv om gangen.
+  // fs.profiles = { active: '<id>', list: { '<id>': { name, access, refresh, scope, exp } }, order: [ids] }
+  function profiles() {
+    var p = store.get('fs.profiles', null);
+    if (!p || !p.list) p = { active: null, list: {}, order: [] };
+    if (!p.order) p.order = Object.keys(p.list);
+    // Flytt innlogging fra eldre versjon (ett token) inn som profil
+    var legacy = store.get('fs.token', null);
+    if (legacy && legacy.refresh) {
+      var id = 'legacy';
+      p.list[id] = Object.assign({ name: '' }, legacy);
+      if (p.order.indexOf(id) < 0) p.order.push(id);
+      if (!p.active) p.active = id;
+      store.set('fs.profiles', p);
+      store.del('fs.token');
+    }
+    return p;
+  }
+  function saveProfiles(p) { store.set('fs.profiles', p); }
 
-  function saveTokens(j) {
-    var old = tokens() || {};
-    store.set('fs.token', {
-      access: j.access_token,
-      refresh: j.refresh_token || old.refresh,   // Spotify roterer refresh-token
-      scope: j.scope || old.scope || '',
-      exp: Date.now() + (j.expires_in || 3600) * 1000
-    });
+  function tokens(id) {
+    var p = profiles();
+    var key = id || p.active;
+    return (key && p.list[key]) || null;
   }
 
-  function startLogin() {
+  function saveTokens(j, id) {
+    var p = profiles();
+    var key = id || p.active;
+    if (!key || !p.list[key]) return;
+    var old = p.list[key];
+    old.access = j.access_token;
+    old.refresh = j.refresh_token || old.refresh;   // Spotify roterer refresh-token
+    old.scope = j.scope || old.scope || '';
+    old.exp = Date.now() + (j.expires_in || 3600) * 1000;
+    saveProfiles(p);
+  }
+
+  function setExpired() {
+    var p = profiles();
+    if (p.active && p.list[p.active]) { p.list[p.active].exp = 0; saveProfiles(p); }
+  }
+
+  function removeProfile(id) {
+    var p = profiles();
+    delete p.list[id];
+    p.order = p.order.filter(function (x) { return x !== id; });
+    if (p.active === id) p.active = p.order[0] || null;
+    saveProfiles(p);
+    return p.active;
+  }
+
+  function profileName(id) {
+    var t = tokens(id);
+    return (t && t.name) || 'Spotify-bruker';
+  }
+
+  // Ny innlogging: finn hvem det er, og legg til eller oppdater profilen
+  function addProfileFromToken(j) {
+    var tmp = {
+      name: '',
+      access: j.access_token,
+      refresh: j.refresh_token,
+      scope: j.scope || '',
+      exp: Date.now() + (j.expires_in || 3600) * 1000
+    };
+    return fetch(API + '/me', { headers: { Authorization: 'Bearer ' + tmp.access } })
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .catch(function () { return {}; })
+      .then(function (me) {
+        var p = profiles();
+        var id = me.id || ('user-' + Date.now());
+        tmp.name = me.display_name || me.id || ('Bruker ' + (p.order.length + 1));
+        // Erstatt en gammel profil uten kjent id hvis det er samme person som logger inn igjen
+        if (p.list.legacy && p.active === 'legacy') {
+          delete p.list.legacy;
+          p.order = p.order.filter(function (x) { return x !== 'legacy'; });
+        }
+        p.list[id] = tmp;
+        if (p.order.indexOf(id) < 0) p.order.push(id);
+        p.active = id;
+        saveProfiles(p);
+        return id;
+      });
+  }
+
+  // Navnet mangler på profiler fra eldre versjon: hent det i bakgrunnen
+  function fillMissingName() {
+    var p = profiles();
+    var t = p.active && p.list[p.active];
+    if (!t || t.name) return;
+    var id = p.active;
+    accessToken().then(function (tok) {
+      return fetch(API + '/me', { headers: { Authorization: 'Bearer ' + tok } });
+    }).then(function (r) { return r.ok ? r.json() : null; }).then(function (me) {
+      if (!me) return;
+      var q = profiles();
+      if (!q.list[id]) return;
+      q.list[id].name = me.display_name || me.id || '';
+      // Gi profilen den ekte Spotify-id-en
+      if (id === 'legacy' && me.id && !q.list[me.id]) {
+        q.list[me.id] = q.list[id];
+        delete q.list[id];
+        q.order = q.order.map(function (x) { return x === id ? me.id : x; });
+        if (q.active === id) q.active = me.id;
+      }
+      saveProfiles(q);
+    }).catch(function () {});
+  }
+
+  function startLogin(chooseAccount) {
     if (!CLIENT_ID) return;
     var verifier = randomString(64);
     var st = randomString(16);
@@ -251,6 +349,8 @@
         code_challenge: base64url(hash),
         state: st
       };
+      // Viser Spotifys samtykkeside med «Ikke deg?», slik at en annen konto kan logge inn
+      if (chooseAccount) params.show_dialog = 'true';
       location.href = ACCOUNTS + '/authorize?' + Object.keys(params).map(function (k) {
         return k + '=' + encodeURIComponent(params[k]);
       }).join('&');
@@ -297,25 +397,26 @@
         toast('Spotify avviste innloggingen (' + (res.json.error_description || res.status) + ').', 8000);
         return false;
       }
-      saveTokens(res.json);
-      return true;
+      return addProfileFromToken(res.json).then(function () { return true; });
     });
   }
 
   var refreshing = null;
   function refreshAccess() {
     if (refreshing) return refreshing;
-    var t = tokens();
+    var id = profiles().active;
+    var t = tokens(id);
     if (!t || !t.refresh) return Promise.reject(new AuthError('no refresh token'));
     refreshing = tokenRequest({
       grant_type: 'refresh_token',
       refresh_token: t.refresh,
       client_id: CLIENT_ID
     }).then(function (res) {
-      if (res.ok) { saveTokens(res.json); return tokens().access; }
+      if (res.ok) { saveTokens(res.json, id); return tokens(id).access; }
       if (res.status === 400 || res.status === 401) {
-        store.del('fs.token');
-        throw new AuthError(res.json.error || 'invalid_grant');
+        var err = new AuthError(res.json.error || 'invalid_grant');
+        err.profile = id;
+        throw err;
       }
       throw new Error('token ' + res.status);
     });
@@ -331,12 +432,53 @@
     return refreshAccess();
   }
 
+  // Fjerner den aktive brukeren fra denne enheten og bytter til neste, hvis det finnes en
   function logout() {
-    store.del('fs.token');
-    state.loggedIn = false;
-    clearTimeout(state.pollTimer);
-    enterArt();
-    showLogin();
+    var name = profileName();
+    var next = removeProfile(profiles().active);
+    if (next) {
+      activateProfile(next, name + ' er fjernet. ');
+    } else {
+      state.loggedIn = false;
+      clearTimeout(state.pollTimer);
+      resetForUser();
+      enterArt();
+      showLogin();
+    }
+  }
+
+  // Tøm alt som hører til forrige bruker
+  function resetForUser() {
+    state.top = [];
+    state.topIdx = 0;
+    state.topLoadedAt = 0;
+    state.topRangeLoaded = null;
+    state.scopePrompted = false;
+    state.lastActive = 0;
+    state.failures = 0;
+  }
+
+  function activateProfile(id, prefix) {
+    var p = profiles();
+    if (!p.list[id]) return;
+    p.active = id;
+    saveProfiles(p);
+    state.loggedIn = true;
+    resetForUser();
+    hideLogin();
+    toast((prefix || '') + 'Viser ' + profileName(id) + '.', 4000);
+    // Tving ny visning: musikk hvis det spilles, ellers hvilevisningen for den nye brukeren
+    state.mode = null;
+    state.key = null;
+    schedulePoll(50);
+    fillMissingName();
+  }
+
+  function cycleProfile(dir) {
+    var p = profiles();
+    if (p.order.length < 2) return;
+    var i = p.order.indexOf(p.active);
+    activateProfile(p.order[(i + dir + p.order.length) % p.order.length]);
   }
 
   // ---------------------------------------------------------------- hva spilles nå
@@ -349,7 +491,7 @@
     }).then(function (r) {
       if (r.status === 204) return { none: true };
       if (r.status === 401 && !retried) {
-        var t = tokens(); if (t) { t.exp = 0; store.set('fs.token', t); }
+        setExpired();
         return fetchNowPlaying(true);
       }
       if (r.status === 429) {
@@ -453,9 +595,16 @@
       schedulePoll(next);
     }).catch(function (err) {
       if (err && err.auth) {
+        var deadName = profileName(err.profile);
+        var next = err.profile ? removeProfile(err.profile) : null;
+        if (next) {
+          activateProfile(next, deadName + ' må logge inn på nytt. ');
+          return;
+        }
         state.loggedIn = false;
+        resetForUser();
         enterArt();
-        showLogin('Spotify-tilgangen er utløpt. Koble til på nytt.');
+        showLogin('Spotify-tilgangen er utløpt' + (err.profile ? ' for ' + deadName : '') + '. Koble til på nytt.');
         return;
       }
       var next;
@@ -981,8 +1130,14 @@
   var menuItems = [];
 
   function buildMenu() {
-    menuItems = OPTIONS.filter(function (o) { return !o.when || o.when(); })
-      .map(function (o) { return { type: 'option', opt: o }; });
+    menuItems = [];
+    var prof = profiles();
+    // Brukervalg øverst når mer enn én bruker er lagret
+    if (!DEMO && state.loggedIn && prof.order.length > 1) {
+      menuItems.push({ type: 'profile', label: 'Spotify-bruker' });
+    }
+    menuItems = menuItems.concat(OPTIONS.filter(function (o) { return !o.when || o.when(); })
+      .map(function (o) { return { type: 'option', opt: o }; }));
     var nextLabel = settings.idleShow === 'top' ? 'Vis neste album' : (settings.idleShow === 'art' ? 'Vis neste eget bilde' : null);
     if (nextLabel) {
       menuItems.push({ type: 'action', label: nextLabel, run: function () {
@@ -991,9 +1146,12 @@
     }
     if (!DEMO) {
       if (state.loggedIn) {
-        menuItems.push({ type: 'action', label: 'Koble til Spotify på nytt', sep: !nextLabel,
+        menuItems.push({ type: 'action', label: 'Legg til Spotify-bruker', sep: !nextLabel,
+          run: function () { closeMenu(); startLogin(true); } });
+        menuItems.push({ type: 'action', label: 'Koble til ' + profileName() + ' på nytt',
           run: function () { closeMenu(); startLogin(); } });
-        menuItems.push({ type: 'action', label: 'Logg ut av Spotify', run: function () { closeMenu(); logout(); } });
+        menuItems.push({ type: 'action', label: 'Fjern ' + profileName() + ' fra denne skjermen',
+          run: function () { closeMenu(); logout(); } });
       } else {
         menuItems.push({ type: 'action', label: 'Koble til Spotify', sep: !nextLabel,
           run: function () { closeMenu(); showLogin(); } });
@@ -1006,7 +1164,8 @@
       var li = el('li', item.type === 'action' ? 'action' : '');
       if (item.sep) li.className += ' sep';
       li.appendChild(el('span', 'm-label', item.type === 'option' ? item.opt.label : item.label));
-      li.appendChild(el('span', 'm-value', item.type === 'option' ? currentLabel(item.opt) : ''));
+      var value = item.type === 'option' ? currentLabel(item.opt) : (item.type === 'profile' ? profileName() : '');
+      li.appendChild(el('span', 'm-value', value));
       li.addEventListener('click', function (e) {
         e.stopPropagation();
         menuFocus = i;
@@ -1031,6 +1190,16 @@
   function activate(dir) {
     var item = menuItems[menuFocus];
     if (item.type === 'action') { item.run(); return; }
+    if (item.type === 'profile') {
+      cycleProfile(dir);
+      $menuList.children[menuFocus].querySelector('.m-value').textContent = profileName();
+      // Navnene i «Koble til …» og «Fjern …» følger aktiv bruker
+      var keep = menuFocus;
+      buildMenu();
+      menuFocus = keep;
+      updateMenuFocus();
+      return;
+    }
     var o = item.opt;
     var idx = 0;
     for (var i = 0; i < o.values.length; i++) if (o.values[i][0] === settings[o.key]) idx = i;
@@ -1160,10 +1329,12 @@
       return;
     }
 
-    handleCallback().then(function () {
+    handleCallback().then(function (added) {
       state.loggedIn = !!tokens();
       if (state.loggedIn) {
         hideLogin();
+        if (added && profiles().order.length > 1) toast('Viser ' + profileName() + '. Bytt bruker i menyen.', 6000);
+        fillMissingName();
         poll();
       } else {
         enterArt();

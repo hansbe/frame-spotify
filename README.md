@@ -61,6 +61,17 @@ Topplisten krever tillatelsen `user-top-read`. Har du logget inn før denne kom 
 
 Valgene kan også settes i adressen, f.eks. `?mat=black&label=museum&size=large`.
 
+## Flere brukere på samme TV
+
+Hver person logger inn på TV-en én gang. Etterpå byttes det uten tastatur:
+
+1. Velg **Legg til Spotify-bruker** i menyen. Spotify viser en side med «Ikke deg?», der den andre personen logger inn med sin konto.
+2. Når mer enn én bruker er lagret, står **Spotify-bruker** øverst i menyen. Venstre/høyre bytter mellom dem.
+3. **Fjern … fra denne skjermen** sletter den aktive brukeren fra TV-en.
+
+Kontoen må stå under *User Management* i Spotify-appen (maks fem).
+
+
 ## Egne bilder
 
 Velg *Egne bilder* under «Når ingenting spilles». Legg bilder i mappen `art/` i repoet. På mobilen: åpne repoet i GitHub-appen eller på github.com, gå til `art/` og velg **Add file → Upload files**. Bildene publiseres automatisk og dukker opp på TV-en innen ti minutter. På Vercel henter appen bildelisten fra GitHub-repoet (`githubRepo` i `config.js`); på GitHub Pages lages lista ved publisering.
